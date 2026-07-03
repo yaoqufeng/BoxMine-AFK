@@ -1,0 +1,69 @@
+name: BoxMine AFK
+
+on:
+  workflow_dispatch:
+
+jobs:
+  run_boxmine_afk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 480
+
+    steps:
+      - name: 📥 下载私库脚本
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.repository_owner }}/BoxMine-AFK-Private  # 更新仓库名称
+          token: ${{ secrets.PRIVATE_REPO_TOKEN }}
+          path: private
+
+      - name: 📂 复制脚本到工作目录
+        run: cp private/boxmine_afk.py boxmine_afk.py
+
+      - name: 🐍 设置Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: 🛡️ 启动GOST代理
+        if: ${{ env.GOST_PROXY != '' }}
+        env:
+          GOST_PROXY: ${{ secrets.GOST_PROXY }}
+        run: |
+          VERSION=$(curl -s https://api.github.com/repos/ginuerzh/gost/releases/latest | grep '"tag_name"' | cut -d'"' -f4 | tr -d 'v')
+          echo "📦 GOST版本: $VERSION"
+          wget -q "https://github.com/ginuerzh/gost/releases/download/v${VERSION}/gost_${VERSION}_linux_amd64.tar.gz"
+          tar -xzf "gost_${VERSION}_linux_amd64.tar.gz"
+          chmod +x gost
+          nohup ./gost -L http://:8080 -F "$GOST_PROXY" > gost.log 2>&1 &
+          sleep 3
+          echo "✅ GOST已启动，测试连通性..."
+          curl -s -x http://127.0.0.1:8080 https://api.ipify.org | sed 's/\([0-9]*\.[0-9]*\.\)[0-9]*\.[0-9]*/\1**.**/g'
+          echo ""
+
+      - name: 🐍 安装Python依赖
+        run: pip install requests websockets
+
+      - name: 🚀 执行挂机
+        env:
+          PYTHONIOENCODING: utf-8
+          DISCORD_TOKEN: ${{ secrets.DISCORD_TOKEN }}
+          TG_BOT: ${{ secrets.TG_BOT }}
+          GOST_PROXY: ${{ secrets.GOST_PROXY }}
+        run: python boxmine_afk.py
+
+      - name: 📤 推回私库
+        if: always()
+        env:
+          PRIVATE_REPO_TOKEN: ${{ secrets.PRIVATE_REPO_TOKEN }}
+        run: |
+          cd private
+          if ! git diff --quiet; then
+            git config user.email "actions@github.com"
+            git config user.name "GitHub Actions"
+            git add boxmine_afk.py
+            git commit -m "🔄 自动更新 [skip ci]"
+            git push "https://${PRIVATE_REPO_TOKEN}@github.com/${{ github.repository_owner }}/BoxMine-AFK-Private.git" HEAD  # 更新仓库名称
+            echo "✅ 推送成功"
+          else:
+            echo "ℹ️ 无需推送"
+          fi
