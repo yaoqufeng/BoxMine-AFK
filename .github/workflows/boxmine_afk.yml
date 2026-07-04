@@ -1,7 +1,9 @@
 name: BoxMine AFK
 
 on:
-  workflow_dispatch:
+  workflow_dispatch:      # 保留手动触发按钮，方便随时测试
+  schedule:
+    - cron: '0 10 * * *'  # 北京时间每天 18:00 运行 (UTC 10:00)
 
 jobs:
   run_boxmine_afk:
