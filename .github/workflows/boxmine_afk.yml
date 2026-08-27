@@ -3,18 +3,23 @@ name: BoxMine AFK
 on:
   workflow_dispatch:      # 允许手动触发
   schedule:
-    - cron: '0 16 * * *'  # 北京时间 00:00 运行 (UTC 10:00)
+    - cron: '0 16 * * *'  # 北京时间 00:00 运行 (UTC 16:00)
 
 jobs:
   run_boxmine_afk:
     runs-on: ubuntu-latest
     timeout-minutes: 480
+    permissions:
+      contents: write     # 授予当前仓库的写入权限，用于保活提交
 
     steps:
+      - name: 📥 检出当前仓库
+        uses: actions/checkout@v4
+
       - name: 📥 下载私库脚本
         uses: actions/checkout@v4
         with:
-          repository: ${{ github.repository_owner }}/BoxMine-AFK-Private  # 更新仓库名称
+          repository: ${{ github.repository_owner }}/BoxMine-AFK-Private
           token: ${{ secrets.PRIVATE_REPO_TOKEN }}
           path: private
 
@@ -64,8 +69,16 @@ jobs:
             git config user.name "GitHub Actions"
             git add boxmine_afk.py
             git commit -m "🔄 自动更新 [skip ci]"
-            git push "https://${PRIVATE_REPO_TOKEN}@github.com/${{ github.repository_owner }}/BoxMine-AFK-Private.git" HEAD  # 更新仓库名称
+            git push "https://${PRIVATE_REPO_TOKEN}@github.com/${{ github.repository_owner }}/BoxMine-AFK-Private.git" HEAD
             echo "✅ 推送成功"
-          else:
+          else
             echo "ℹ️ 无需推送"
           fi
+
+      - name: 🔄 当前仓库保活提交
+        if: always()
+        run: |
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+          git commit --allow-empty -m "chore: keep actions alive [skip ci]"
+          git push origin HEAD
